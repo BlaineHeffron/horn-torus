@@ -155,9 +155,11 @@ body.presenting.awake #exitShow { display: block; }
           <input type="file" id="audioFile" accept="audio/*" hidden>
           <button id="follow" class="on" title="Let the detector set BPM and beat phase">Follow beat</button>
         </div>
+        <div class="ctl"><span>Listen to</span><select id="audioIn" aria-label="Audio input">
+          <option value="mic">Microphone (room)</option><option value="screen">Computer audio (share a tab or screen)</option></select><span></span></div>
         <div class="meter" aria-hidden="true"><i id="lvl"></i><b id="hit"></b></div>
         <audio id="player" controls hidden style="width:100%"></audio>
-        <p class="hint" id="audioStatus">Listen uses the microphone to find the tempo and lock the beat phase. Each detected hit also kicks the pulse.</p>
+        <p class="hint" id="audioStatus">Listen finds the tempo and locks the beat phase. Each detected hit also kicks the pulse. For music playing on this computer: in Chrome or Edge pick "Computer audio" and share with audio on (on Windows, Entire screen + "Also share system audio"; on Linux, a tab). In Firefox or Waterfox on Linux, pick a "Monitor of …" input instead. It appears after you allow the microphone once.</p>
       </div>
     </details>
 
@@ -1419,15 +1421,40 @@ function audioCtx() {
 $('listen').onclick = async () => {
   if (ear.stream) { attach(audioCtx().createGain(), false); ear.an = null; $('listen').classList.remove('on'); earStatus('Stopped listening.'); return; }
   try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('no getUserMedia');
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const src = $('audioIn').value, raw = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    let stream;
+    if (src === 'screen') {
+      if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('This browser cannot share computer audio. Pick a "Monitor of …" input instead.');
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: raw, systemAudio: 'include' });
+      stream.getVideoTracks().forEach(t => t.stop());   // only the sound is used
+      if (!stream.getAudioTracks().length) { stream.getTracks().forEach(t => t.stop()); throw new Error('No sound was shared. Share again and turn on the audio option in the share dialog.'); }
+    } else {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('no getUserMedia');
+      stream = await navigator.mediaDevices.getUserMedia({ audio: src === 'mic' ? raw : { ...raw, deviceId: { exact: src } } });
+      listInputs();   // labels (and Linux "Monitor of …" sources) show once the mic is allowed
+    }
     attach(audioCtx().createMediaStreamSource(stream), false); ear.stream = stream;
+    stream.getAudioTracks()[0].onended = () => { if (ear.stream === stream) $('listen').click(); };   // sharing stopped from the browser bar
     $('listen').classList.add('on'); $('player').pause();
-    earStatus('Listening. Give it about 8 seconds of music to lock the tempo.');
+    earStatus(`Listening to ${$('audioIn').selectedOptions[0].text.replace(/ \(.*/, '').toLowerCase()}. Give it about 8 seconds of music to lock the tempo.`);
   } catch (e) {
-    earStatus('The microphone is not available here. Inside the Claude viewer, pages cannot use the mic: open this page as a file in Chrome or Firefox for room listening, or use "Analyze a track".');
+    earStatus(e.name === 'NotAllowedError' ? 'Permission was declined.' : /share|Monitor/.test(e.message) ? e.message
+      : 'Audio input is not available here. Inside the Claude viewer, pages cannot listen: open the page directly (GitHub Pages or locally), or use "Analyze a track".');
   }
 };
+// Input devices for "Listen to". Monitor sources on Linux (PulseAudio/PipeWire) carry what the computer is playing.
+async function listInputs() {
+  try {
+    const sel = $('audioIn'), keep = sel.value;
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.label);
+    sel.querySelectorAll('[data-dev]').forEach(o => o.remove());
+    devs.sort((a, b) => /monitor/i.test(b.label) - /monitor/i.test(a.label)).forEach(d => {
+      const o = new Option(d.label, d.deviceId); o.dataset.dev = ''; sel.add(o);
+    });
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : 'mic';
+  } catch (e) { /* no device list in this browser */ }
+}
+listInputs(); navigator.mediaDevices?.addEventListener?.('devicechange', listInputs);
 $('audioFile').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
   const player = $('player');
