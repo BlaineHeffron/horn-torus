@@ -1,0 +1,51 @@
+{
+ "savedShows": [
+  {
+   "name": "Solstice",
+   "scenes": [
+    { "turns": [2, 4, 6, 8, 10, 12, 14, 16], "drift": [0, 0.01, -0.02, 0.03, -0.04, 0.05, -0.06, 0.07], "hold": 24, "morph": 8 },
+    { "turns": [5, -3, 4, -1, 6, -2, 3], "drift": [0, 0.125, 0.25, -0.125, 0.5, -0.25, 0.0625], "hold": 12, "morph": 2 },
+    { "turns": [7, 1, 7, 1, 7, 1], "drift": [0.03, 0, -0.03, 0, 0.03, 0], "hold": 48, "morph": 12 },
+    { "turns": [12, 1, 1, 1], "drift": [0, 1.5, -1.5, 0.75], "hold": 8, "morph": 1 },
+    { "turns": [6, 4, 2], "drift": [0.25, -0.5, 1], "hold": 16, "morph": 4 },
+    { "turns": [1, 9], "drift": [0, 0.33], "hold": 32, "morph": 16 },
+    { "turns": [4, 4], "drift": [0.02, -0.02], "hold": 8, "morph": 6 }
+   ],
+   "P": {
+    "hueDim": 5, "litDim": 3, "hueStep": -12, "hueRange": 90,
+    "tilt": 80, "persp": 0.1, "depthFade": 0.8, "mesh": 0.4, "pulse": 0.03,
+    "size": 1.6, "gain": 2.4, "exposure": 1.2,
+    "fbMode": 1, "decay": 0.93, "zoom": 0.97, "fbRot": -8, "seg": 5,
+    "ifsN": 5, "ifsS": 0.38, "ifsOff": 0.55, "ifsSpin": -6,
+    "fractal": 0.6, "fType": 0, "fSolid": 0.15, "fZoom": 2.4, "fScale": 1.12, "fBeats": 12, "fSlice": 0.3,
+    "rots": [[1, 2, 6], [2, 3, -4], [3, 4, 12], [4, 5, -2.5], [5, 6, 8], [6, 7, -15], [7, 8, 3], [3, 7, 20]],
+    "lfos": [
+     { "key": "tilt", "shape": "triangle", "period": 64, "depth": 0.35 },
+     { "key": "persp", "shape": "square", "period": 16, "depth": 0.4 },
+     { "key": "pulse", "shape": "saw", "period": 1, "depth": 0.15 },
+     { "key": "hueRange", "shape": "triangle", "period": 32, "depth": 0.5 },
+     { "key": "size", "shape": "square", "period": 2, "depth": 0.25 },
+     { "key": "gain", "shape": "saw", "period": 4, "depth": 0.3 },
+     { "key": "decay", "shape": "triangle", "period": 8, "depth": 0.06 },
+     { "key": "fScale", "shape": "sine", "period": 16, "depth": 0.2 },
+     { "key": "fSlice", "shape": "triangle", "period": 4, "depth": 0.5 },
+     { "key": "glide", "shape": "saw", "period": 32, "depth": 0.8 },
+     { "key": "seg", "shape": "square", "period": 32, "depth": 0.4 },
+     { "key": "zoom", "shape": "triangle", "period": 16, "depth": 0.12 }
+    ],
+    "links": [
+     { "band": 0, "key": "tilt", "depth": -0.2 },
+     { "band": 1, "key": "fSolid", "depth": 0.5 },
+     { "band": 1, "key": "size", "depth": 0.3 },
+     { "band": 2, "key": "fbRot", "depth": 0.35 },
+     { "band": 3, "key": "fSlice", "depth": -0.4 },
+     { "band": 4, "key": "exposure", "depth": 0.3 },
+     { "band": 5, "key": "mesh", "depth": 0.5 },
+     { "band": 5, "key": "hueStep", "depth": -0.6 },
+     { "band": 0, "key": "decay", "depth": 0.05 }
+    ],
+    "audioResp": 0.75, "cycleMode": 2, "cycleEvery": 2, "glide": 0.6, "cycleSpeed": 20, "auto": true
+   }
+  }
+ ]
+}
