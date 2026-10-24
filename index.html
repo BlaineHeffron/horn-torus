@@ -719,7 +719,7 @@ vec3 sampSoft(sampler2D t, vec2 p) { return samp(t, p) * smoothstep(.5, .3, leng
 const COMP_FS = `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 o;
-uniform sampler2D uCurve; uniform sampler2D uPrev;
+uniform sampler2D uCurve; uniform sampler2D uPrev; uniform sampler2D uPts; uniform float uPtsOn;
 uniform int uMode; uniform float uDecay; uniform float uZoom; uniform float uFbRot;
 uniform float uSeg; uniform float uIfsN; uniform float uIfsS; uniform float uIfsOff; uniform float uIfsRot;
 ${COMMON}
@@ -732,6 +732,10 @@ vec2 fold(vec2 p) {
 void main() {
   vec2 p = toP(vUv);
   vec3 c = samp(uCurve, fold(p));
+  // Point fractal, soft-capped at .5 per pixel and keeping its hue: when the cloud collapses onto a few
+  // lines, the stacked points would otherwise blow out to a white-pink haze.
+  vec3 q = samp(uPts, fold(p)) * uPtsOn; float L = max(max(q.r, q.g), max(q.b, 1e-6));
+  c += q * .5 * (1. - exp(-L / .5)) / L;
   vec3 f = vec3(0.);
   if (uMode == 1) f = sampMirror(uPrev, rot(uFbRot) * p / uZoom);
   else if (uMode == 2) {
@@ -785,7 +789,7 @@ function target(w, h) {
   gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
   return { tex, fb, w, h };
 }
-let W = 0, H = 0, RS = 1, curveT, fractT, fbs, fractStale = true;
+let W = 0, H = 0, RS = 1, curveT, ptsT, fractT, fbs, fractStale = true;
 // Adaptive quality: if frames run slow, render fewer pixels; when there is headroom, step back up. Checked once a second.
 // First steps down: render the background fractal at half resolution, then redraw it every other frame.
 // Then lower the resolution of everything.
@@ -813,8 +817,8 @@ function resize() {
   const w = Math.max(2, Math.round(cv.clientWidth * RS)), h = Math.max(2, Math.round(cv.clientHeight * RS));
   if (w === W && h === H && fractT.w === Math.ceil(W / quality.fractalDiv)) return;
   W = cv.width = w; H = cv.height = h;
-  for (const t of [curveT, fractT, ...(fbs || [])]) if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
-  curveT = target(W, H); fractT = target(Math.ceil(W / quality.fractalDiv), Math.ceil(H / quality.fractalDiv)); fractStale = true; fbs = [target(W, H), target(W, H)];
+  for (const t of [curveT, ptsT, fractT, ...(fbs || [])]) if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+  curveT = target(W, H); ptsT = target(W, H); fractT = target(Math.ceil(W / quality.fractalDiv), Math.ceil(H / quality.fractalDiv)); fractStale = true; fbs = [target(W, H), target(W, H)];
 }
 
 // ---------- clock & sequencing ----------
@@ -1031,7 +1035,9 @@ function frame(now) {
   gl.uniform1f(cu.uHueBase, view.hue); gl.uniform1f(cu.uHueRange, P.hueRange);
   gl.uniform1f(cu.uHead, 0); gl.drawArrays(gl.POINTS, 0, S + 1);
   if (P.fractal > 0) { gl.uniform1f(cu.uHead, 1); gl.uniform1f(cu.uHeadT, tH); gl.drawArrays(gl.POINTS, 0, 1); }
-  if (P.fractal > 0 && P.fType >= 2) {   // point-cloud fractals live in the curve's 9D space and go through feedback
+  const ptsOn = P.fractal > 0 && P.fType >= 2;
+  if (ptsOn) {   // point-cloud fractals live in the curve's 9D space and go through feedback; own buffer, capped when composited
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ptsT.fb); gl.clear(gl.COLOR_BUFFER_BIT);
     const Kn = m < 0.5 ? padA : padB, Kp = m < 0.5 ? phA : phB, Nk = (m < 0.5 ? A : B).turns.length, D = Nk + 1;
     for (let i = 0; i < 8; i++) thBuf[i] = Kn[i] * tH + Kp[i];   // the head's current angles
     // Julia c in D dims: (kr, ki·u), u along (1, d3, d4, ...) of the head (same as the 4D formula for D = 4).
@@ -1057,6 +1063,7 @@ function frame(now) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb);
   const k = compProg.u; gl.useProgram(compProg.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, curveT.tex); gl.uniform1i(k.uCurve, 0);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, ptsT.tex); gl.uniform1i(k.uPts, 2); gl.uniform1f(k.uPtsOn, ptsOn ? 1 : 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, src.tex); gl.uniform1i(k.uPrev, 1);
   gl.uniform2f(k.uRes, W, H); gl.uniform1i(k.uMode, P.fbMode);
   gl.uniform1f(k.uDecay, P.fbMode ? P.decay : 0); gl.uniform1f(k.uZoom, P.zoom); gl.uniform1f(k.uFbRot, view.fbRot);
