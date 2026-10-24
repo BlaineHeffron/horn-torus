@@ -180,7 +180,7 @@ body.presenting.awake #exitShow { display: block; }
       <summary>How the planes work</summary>
       <div class="body">
         <p class="hint">Each angle θ<sub>k</sub> is a rotation in one plane. θ<sub>1</sub> rotates the fixed d1–d2 plane, around the ring. θ<sub>k</sub> for k ≥ 2 rotates the plane spanned by r<sub>k−1</sub>, the outward direction of the level above, and the new axis d<sub>k+1</sub>. That is the trip around level k's tube. The plane moves with the levels above it, so the frame is nested, like gimbals.</p>
-        <p class="hint"><b>Turns</b> n<sub>k</sub> is how many full rotations that plane makes per trip around the loop. It has to be an integer for the loop to close. <b>Drift</b> δ<sub>k</sub> is how fast that rotation slides in time, in cycles per beat. The whole loop is drawn at once, so drift is what you see move.</p>
+        <p class="hint"><b>Turns</b> n<sub>k</sub> is how many full rotations that plane makes per trip around the loop. It can be a fraction such as 3/2 (denominators up to 12). Then the loop goes around 2 times before it closes: once around per denominator. <b>Drift</b> δ<sub>k</sub> is how fast that rotation slides in time, in cycles per beat. The whole loop is drawn at once, so drift is what you see move.</p>
         <p class="hint">The <b>head</b> is a point that travels the loop once every C beats (the fractal cycle). Its rotation speed in plane k is ω<sub>k</sub> = n<sub>k</sub> / C + δ<sub>k</sub> cycles per beat. That's the "head speed" column. To get a speed ω you want: pick C, set n<sub>k</sub> = round(ω·C), then set δ<sub>k</sub> = ω − n<sub>k</sub>/C.</p>
         <p class="hint"><b>Picture rotations</b> are a separate, rigid rotation of the whole 9D space in any fixed coordinate plane d<sub>i</sub>–d<sub>j</sub>. The camera then shows d1, d2, d3 in perspective, and color shows the hidden axes.</p>
       </div>
@@ -355,7 +355,7 @@ const LFO_SHAPES = {
 };
 let P, scenes, showIdx = 0;
 function cleanScene(s) {
-  let turns = (s.turns || []).map(v => Math.max(-64, Math.min(64, Math.round(Number(v) || 0)))).slice(0, MAXN);
+  let turns = (s.turns || []).map(v => { const [p, q] = ratio(Math.max(-64, Math.min(64, Number(v) || 0))); return p / q; }).slice(0, MAXN);
   if (!turns.length) turns = [1];
   const drift = turns.map((_, i) => Number((s.drift || [])[i]) || 0);
   return { turns, drift, hold: Math.max(1, Number(s.hold) || 16), morph: Math.max(0.25, Number(s.morph) || 4) };
@@ -416,6 +416,15 @@ function hornTorus(t, n, ph, N, out) {
 }
 const loopLength = n => n.reduce((s, v, k) => s + Math.abs(v) * 0.5 * Math.pow(2, -k), 0) * TAU + 1;
 const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
+// Turns are fractions p/q with q <= 12: the nearest one, preferring the smaller q.
+function ratio(v) { let best = [Math.round(v), 1]; for (let q = 2; q <= 12; q++) if (Math.abs(Math.round(v * q) / q - v) < Math.abs(best[0] / best[1] - v) - 1e-9) best = [Math.round(v * q), q]; return best; }
+const fmtTurn = v => { const [p, q] = ratio(v); return q > 1 ? `${p}/${q}` : `${p}`; };
+// Trips around the loop before it closes, for fractional turns: the smallest Q making every n·Q a whole number
+// (lcm of the denominators over the gcd of the resulting numerators). Whole turns keep Q = 1.
+const closeAfter = (...ts) => {
+  ts = ts.flat(); const L = ts.reduce((Q, v) => { const q = ratio(v)[1]; return Q * q / gcd(Q, q); }, 1);
+  return L === 1 ? 1 : L / ts.reduce((g, v) => gcd(g, Math.round(v * L)), 0);
+};
 
 // ---------- WebGL ----------
 const cv = $('stage');
@@ -951,14 +960,17 @@ function frame(now) {
 
   // The curve to draw, as turns n and phases ph for t = 0..2π. Loop: the closed loop. Trail / pattern: the head's
   // own path over traceBeats beats at speeds ω_k (cycles/beat). The trail ends at the head; the pattern starts at beat 0.
-  const tHead = (TAU * clock.beat / P.fBeats) % TAU, Wb = P.traceBeats;
+  // Fractional turns: the loop closes after Q trips (Q = 1 for whole turns), so the head's parameter runs
+  // over Q·2π and the loop is drawn with whole turns n·Q over 0..2π.
+  const Q = closeAfter(A.turns, B.turns), tFull = (((TAU * clock.beat / P.fBeats) % (TAU * Q)) + TAU * Q) % (TAU * Q);
+  const tHead = tFull / Q, Wb = P.traceBeats;
   const curve = (s, n, ph) => {
     n.fill(0); ph.fill(0);
     s.turns.forEach((nk, k) => {
-      if (!P.trace) { n[k] = nk; ph[k] = phases[k]; return; }
+      if (!P.trace) { n[k] = nk * Q; ph[k] = phases[k]; return; }
       const w = nk / P.fBeats + s.drift[k] + P['v' + (k + 1)];
       n[k] = w * Wb;
-      if (P.trace === 1) ph[k] = (nk * tHead + phases[k] - TAU * w * Wb) % TAU;
+      if (P.trace === 1) ph[k] = (nk * tFull + phases[k] - TAU * w * Wb) % TAU;
     });
     return n.subarray(0, s.turns.length);
   };
@@ -1049,7 +1061,7 @@ function frame(now) {
   focus.s = Math.min(1, focus.s + dB / 2);
   if (key !== focus.key && (focus.s >= 1 || !focus.from)) { focus.key = key; focus.bits = bits; focus.from = focus.cur; focus.s = 0; }
   {
-    const to = focusPoint(focus.bits, [kr, ki], [1 / ul, head[2] / ul, head[3] / ul], KC, T1, T2, Math.min(12, Math.max(1, Math.abs(n[0])))), fr = focus.from || to;
+    const to = focusPoint(focus.bits, [kr, ki], [1 / ul, head[2] / ul, head[3] / ul], KC, T1, T2, Math.min(12, Math.max(1, Math.round(Math.abs(n[0]))))), fr = focus.from || to;
     const e = focus.s * focus.s * (3 - 2 * focus.s), d = Math.hypot(...to.F.map((v, i) => v - fr.F[i]));
     const dip = Math.max(0, (fr.lm + to.lm) / 2 - Math.log(P.fZoom / Math.max(d, 1e-6))) * Math.sin(Math.PI * e);
     focus.cur = { F: fr.F.map((v, i) => v + (to.F[i] - v) * e), lm: fr.lm + (to.lm - fr.lm) * e - dip };
@@ -1065,7 +1077,7 @@ function frame(now) {
     // Kleinian generators from the scene: k = ring turns, axis period from tube turns, d4 period from the 3rd angle.
     // The head moves the inversion sphere: along the axis (flows along the meridians toward the pinch) and in/out radially.
     gl.uniform1i(f.uFType, P.fType);
-    gl.uniform1f(f.uKRot, Math.min(12, Math.max(1, Math.abs(n[0]))));
+    gl.uniform1f(f.uKRot, Math.min(12, Math.max(1, Math.round(Math.abs(n[0])))));
     gl.uniform2f(f.uKT, T1, T2);
     gl.uniform4f(f.uKC, ...KC);
     gl.uniform1f(f.uKR, 0.85 + 0.3 * P.fScale);   // inversion sphere radius² (Edge distance 1 → 1.15)
@@ -1093,11 +1105,11 @@ function frame(now) {
 }
 
 function readout(S, m) {
-  const A = scenes[seq.from], B = scenes[seq.to], g = A.turns.reduce(gcd, 0);
+  const A = scenes[seq.from], B = scenes[seq.to], Q = closeAfter(A.turns), g = A.turns.reduce((g, v) => gcd(g, Math.round(v * Q)), 0);
   const status = seq.from === seq.to
     ? `holding scene <b>${seq.from + 1}</b>, ${Math.max(0, Math.ceil(seq.holdStart + scenes[seq.from].hold - clock.beat))} beats left`
     : `morphing <b>${seq.from + 1} → ${seq.to + 1}</b> ${Math.round(m * 100)}%`;
-  $('readout').innerHTML = `${status}<br>dimension <b>${A.turns.length + 1}</b>${B !== A ? ` → <b>${B.turns.length + 1}</b>` : ''} · gcd <b>${g}</b>${g > 1 ? ` (retraces ${g}×)` : ''}<br>points <b>${S.toLocaleString()}</b> · render <b>${Math.round(quality.scale * 100)}%</b>${quality.fractalEvery > 1 ? ' · fractal every 2nd frame' : ''} · beat <b>${Math.floor(clock.beat)}</b>`;
+  $('readout').innerHTML = `${status}<br>dimension <b>${A.turns.length + 1}</b>${B !== A ? ` → <b>${B.turns.length + 1}</b>` : ''} · gcd <b>${g}</b>${g > 1 ? ` (retraces ${g}×)` : ''}${Q !== 1 ? ` · closes after <b>${+Q.toFixed(2)}</b> trips` : ''}<br>points <b>${S.toLocaleString()}</b> · render <b>${Math.round(quality.scale * 100)}%</b>${quality.fractalEvery > 1 ? ' · fractal every 2nd frame' : ''} · beat <b>${Math.floor(clock.beat)}</b>`;
   const N = Math.max(scenes[seq.from].turns.length, scenes[seq.to].turns.length);
   const hd = P.hueDim === -2 ? (N >= 3 ? 3 : -1) : P.hueDim, ld = P.litDim === -2 ? (N >= 4 ? 4 : -1) : P.litDim;
   $('projNow').innerHTML = [['x', 0], ['y', 1], ['z', 2], ['hue', hd], ['light', ld]].filter(([, r]) => r >= 0)
@@ -1284,7 +1296,7 @@ function renderScenes() {
   scenes.forEach((s, i) => {
     const b = document.createElement('button');
     b.innerHTML = `${i + 1}<small>${s.turns.length + 1}D</small>`;
-    b.title = `Morph to scene ${i + 1}: turns ${s.turns.join(', ')}`;
+    b.title = `Morph to scene ${i + 1}: turns ${s.turns.map(fmtTurn).join(', ')}`;
     b.onclick = () => go(i);
     strip.appendChild(b);
   });
@@ -1303,7 +1315,7 @@ function renderScenes() {
     <div class="row"><b style="font-family:var(--display)">Scene ${editing + 1}</b><span class="hint">${editing === seq.from ? "playing" : "not playing"}</span><span class="hint">${s.turns.length} angles, ${s.turns.length + 1} dimensions</span></div>
     <table class="planes"><thead><tr><th>angle · plane</th><th>turns</th><th>drift / beat</th><th style="text-align:right">head speed</th></tr></thead><tbody>
     ${s.turns.map((n, k) => `<tr><td>θ${k + 1} <span class="plane">${planeName(k)}</span></td>
-      <td><input type="number" step="1" min="-64" max="64" id="tn${k}" value="${n}" aria-label="θ${k + 1} turns"></td>
+      <td><input type="text" inputmode="decimal" id="tn${k}" value="${fmtTurn(n)}" style="width:56px" title="whole number or fraction, e.g. 3/2" aria-label="θ${k + 1} turns"></td>
       <td><input type="number" step="0.005" id="dr${k}" value="${s.drift[k]}" aria-label="θ${k + 1} drift"></td>
       <td class="speed" id="hs${k}"></td></tr>`).join('')}
     </tbody></table>
@@ -1315,7 +1327,10 @@ function renderScenes() {
     <div class="row hint">hold <input type="number" id="hold" min="1" step="1" value="${s.hold}" style="width:56px"> morph in <input type="number" id="morph" min="0.25" step="0.25" value="${s.morph}" style="width:56px"> beats</div>`;
   const edit = fn => { fn(); scenes[editing] = cleanScene(scenes[editing]); markShow(-1); save(); };
   s.turns.forEach((_, k) => {
-    $('tn' + k).oninput = e => edit(() => { scenes[editing].turns[k] = Math.round(Number(e.target.value) || 0); });
+    $('tn' + k).oninput = e => {
+      const [a, b = '1'] = e.target.value.split('/'), v = Number(a) / Number(b);
+      if (a.trim() && b.trim() && Number.isFinite(v)) edit(() => { scenes[editing].turns[k] = v; });   // ignore half-typed "3/"
+    };
     $('dr' + k).oninput = e => edit(() => { scenes[editing].drift[k] = Number(e.target.value) || 0; });
   });
   $('hold').oninput = e => edit(() => { scenes[editing].hold = Number(e.target.value); });
@@ -1611,7 +1626,7 @@ addEventListener('keydown', e => {
 const GLSL = () => {
   const s = scenes[seq.from];
   return `// Nested horn torus. Paste into any GLSL fractal shader.
-// t in [0, 2pi). n = integer turns per angle, ph = phase per angle (radians), N = number of angles (1..8).
+// t in [0, 2pi·Q), Q = lcm of the turns' denominators (1 for whole turns). n = turns per angle, ph = phase per angle (radians), N = number of angles (1..8).
 // Angle k rotates plane (r_{k-1}, d_{k+1}); angle 1 rotates the d1-d2 plane.
 // Returns d1..d4, each hidden axis scaled to [-1, 1] by its own level.
 vec4 hornTorus(float t, float n[8], float ph[8], int N) {
@@ -1632,7 +1647,7 @@ vec4 hornTorus(float t, float n[8], float ph[8], int N) {
 
 // Current scene ${seq.from + 1}
 const int HT_N = ${s.turns.length};
-const float HT_TURNS[8] = float[8](${[...pad(s.turns)].map(v => v.toFixed(1)).join(', ')});
+const float HT_TURNS[8] = float[8](${[...pad(s.turns)].map(v => +v.toFixed(6) + (Number.isInteger(+v.toFixed(6)) ? '.0' : '')).join(', ')});
 const float HT_DRIFT[8] = float[8](${[...pad(s.drift)].map(v => v.toFixed(4)).join(', ')}); // cycles per beat
 // float beat = iTime * ${P.bpm} / 60.0;
 // float ph[8]; for (int i = 0; i < 8; i++) ph[i] = 6.2831853 * HT_DRIFT[i] * beat;
