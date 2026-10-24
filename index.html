@@ -228,6 +228,9 @@ body.presenting.awake #exitShow { display: block; }
         <p class="hint" id="kHint">Kleinian: the horn torus inverted through its pinch is a cylinder. The fractal is that cylinder's orbit under a translation along its axis (tube turns set the period), a k-fold rotation (k = ring turns), a second translation for 3+ angles, and one inversion sphere that the head steers, all inverted back. Every piece is a Möbius image of the horn torus, and they pile up at the pinch. Edge distance sets the sphere's size.</p>
         <p class="hint" id="pHint">Point fractals are drawn like the curve: same 9D space, picture rotations, camera and hidden-axis colors, and they run through the trails and kaleidoscope. <b>Horn-torus fractal</b>: each nesting level of the torus is the map p → ½(±shift + rotate<sub>k</sub>(±θ<sub>k</sub>) p) in plane d1–d<sub>k+2</sub>. Applying those maps in every order gives a horn torus of horn tori, with the head's current angles θ<sub>k</sub>, so it moves with the loop. <b>Julia</b>: points from running z → ±√(z − c) backward in the scene's dimension, with c from the head. Fractal mix is brightness, zoom is size, and Solidity, d5 slice and Focus don't apply.</p>
         <div class="body flat" id="fractal"></div>
+        <div class="ctl"><span>Focus path</span><select id="fVoyage" aria-label="Focus path">
+          <option value="0">Hop between spots</option><option value="1">Voyage: one long dive</option></select><span></span></div>
+        <p class="hint"><b>Focus depth</b> zooms into the Julia or Kleinian set, one level per step, at a spot the head picks. <b>Hop</b> jumps to a new spot whenever the head's signs change. <b>Voyage</b> dives continuously: depth rises and falls once per closing period (cycle length × the trips the loop needs to close, so fractional turns make long voyages), and each new level's direction is taken from the head as the dive reaches it. Faster dimensions steer finer detail. Up to 16 levels; zoom stops at ×100,000, where the GPU's precision runs out.</p>
         <div class="readout" id="cReadout"></div>
       </div>
     </details>
@@ -302,7 +305,7 @@ const BASE = {
   hueDim: -2, litDim: -2, hueStep: 2, hueRange: 280,
   tilt: 62, persp: 0.35, depthFade: 0.5, mesh: 0.35, pulse: 0.05, size: 2.5, gain: 1.2, exposure: 1.6,
   fbMode: 0, decay: 0.88, zoom: 1.02, fbRot: 3, seg: 1, ifsN: 3, ifsS: 0.5, ifsOff: 0.32, ifsSpin: 2,
-  fractal: 0, fType: 0, fSolid: 0.4, fZoom: 1.7, fScale: 1, fBeats: 16, fSlice: 0.5, fFocus: 0,
+  fractal: 0, fType: 0, fSolid: 0.4, fZoom: 1.7, fScale: 1, fBeats: 16, fSlice: 0.5, fFocus: 0, fVoyage: 0,
   trace: 0, traceBeats: 64, ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(k => ['v' + k, 0])),
   rots: [[0, 1, 3]], lfos: [], links: [], audioResp: 0.3, cycleMode: 0, cycleEvery: 8, glide: 0.25, cycleSpeed: 8,
 };
@@ -940,7 +943,7 @@ function deK4(x, kc, T1, T2, kRot) {
   }
   return Math.max(0.25 * Math.abs(Math.hypot(p[0], p[1]) - 1) / sc, Math.hypot(Math.hypot(x[0], x[1]) - 0.5, x[2], x[3]) - 0.5);
 }
-const focus = { key: '', bits: [], s: 1, from: null, cur: { F: [0, 0, 0, 0], lm: 0 } };
+const focus = { key: '', bits: [], s: 1, from: null, cur: { F: [0, 0, 0, 0], lm: 0 }, vbits: [], vD: null, vLeft: 0 };
 
 // World -> fractal space: the d1–d4 block of the inverse orientation (R transposed), column-major for GLSL.
 function fractalMatrix() {
@@ -1078,15 +1081,31 @@ function frame(now) {
   const KC = [0.5 * head[0], 0.5 * head[1], 0.5 * T1 * head[2], 0.5 * (T2 || 2) * head[3]];
   // Focus: retarget when the head's signs change (at most every 2 beats); glide there, zooming out on the way
   // just enough to keep both points in view.
-  const kDepth = Math.min(10, Math.round(P.fFocus * n.length));
+  const kDepth = Math.min(P.fVoyage ? 16 : 10, Math.round(P.fFocus * n.length));
+  const fp = b => focusPoint(b, [kr, ki], [1 / ul, head[2] / ul, head[3] / ul], KC, T1, T2, Math.min(12, Math.max(1, Math.round(Math.abs(n[0])))));
+  let kIter = kDepth;
+  focus.vD = null;
+  if (P.fVoyage && P.fType < 2) {
+    // Voyage: depth rises and falls once per closing period (Q trips × cycle length). Each level's branch is the
+    // head's sign when the dive reaches it, so the trajectory steers the route; a new level only refines the view
+    // (the deeper point lies inside the current one), so there are no jumps. Resurfacing forgets those levels.
+    const V = Q * P.fBeats, ph = (((clock.beat % V) + V) % V) / V, Dt = kDepth * (0.5 - 0.5 * Math.cos(TAU * ph)), kf = Math.floor(Dt);
+    const vb = focus.vbits; vb.length = Math.min(vb.length, kf + 1);
+    while (vb.length < Math.min(kf + 1, kDepth)) vb.push(head[vb.length % (n.length + 1)] < 0 ? -1 : 1);
+    const a = fp(vb.slice(0, kf)), b = fp(vb.slice(0, kf + 1)), t = Dt - kf;
+    focus.cur = { F: a.F.map((v, i) => v + (b.F[i] - v) * t), lm: Math.min(11.5, a.lm + (b.lm - a.lm) * t) };
+    focus.from = focus.cur; focus.s = 1; focus.key = ''; focus.bits = vb.slice(0, Math.ceil(Dt)); kIter = Math.ceil(Dt);
+    focus.vD = Dt; focus.vLeft = V * (1 - ph);
+  } else {
   const bits = Array.from({ length: kDepth }, (_, i) => head[i % (n.length + 1)] < 0 ? -1 : 1), key = P.fType + bits.join('');
   focus.s = Math.min(1, focus.s + dB / 2);
   if (key !== focus.key && (focus.s >= 1 || !focus.from)) { focus.key = key; focus.bits = bits; focus.from = focus.cur; focus.s = 0; }
   {
-    const to = focusPoint(focus.bits, [kr, ki], [1 / ul, head[2] / ul, head[3] / ul], KC, T1, T2, Math.min(12, Math.max(1, Math.round(Math.abs(n[0]))))), fr = focus.from || to;
+    const to = fp(focus.bits), fr = focus.from || to;
     const e = focus.s * focus.s * (3 - 2 * focus.s), d = Math.hypot(...to.F.map((v, i) => v - fr.F[i]));
     const dip = Math.max(0, (fr.lm + to.lm) / 2 - Math.log(P.fZoom / Math.max(d, 1e-6))) * Math.sin(Math.PI * e);
     focus.cur = { F: fr.F.map((v, i) => v + (to.F[i] - v) * e), lm: fr.lm + (to.lm - fr.lm) * e - dip };
+  }
   }
   if (P.fractal > 0 && P.fType < 2 && (quality.frame % quality.fractalEvery === 0 || fractStale)) {
     fractStale = false;
@@ -1104,7 +1123,7 @@ function frame(now) {
     gl.uniform4f(f.uKC, ...KC);
     gl.uniform1f(f.uKR, 0.85 + 0.3 * P.fScale);   // inversion sphere radius² (Edge distance 1 → 1.15)
     gl.uniform1f(f.uZoom, (P.fType === 1 ? P.fZoom / 1.7 : P.fZoom) / Math.exp(focus.cur.lm));
-    gl.uniform4f(f.uF, ...focus.cur.F); gl.uniform1f(f.uFade, 0.22 / Math.exp(focus.cur.lm)); gl.uniform1i(f.uIter, P.fType === 1 ? 9 + kDepth : 12 + 2 * kDepth);
+    gl.uniform4f(f.uF, ...focus.cur.F); gl.uniform1f(f.uFade, 0.22 / Math.exp(focus.cur.lm)); gl.uniform1i(f.uIter, P.fType === 1 ? 9 + kIter : 12 + 2 * kIter);
     // Bounding radius in view units: the Julia set lies within |q| < 1.75; the Kleinian set inside the solid horn torus (|x| <= 1).
     gl.uniform1f(f.uBound, P.fType === 1 ? 1.02 * 1.7 / P.fZoom : 1.75 / P.fZoom);
     gl.uniform1f(f.uHueBase, view.hue); gl.uniform1f(f.uHueRange, P.hueRange); gl.uniform1f(f.uSolid, P.fSolid);
@@ -1137,7 +1156,7 @@ function readout(S, m) {
   $('projNow').innerHTML = [['x', 0], ['y', 1], ['z', 2], ['hue', hd], ['light', ld]].filter(([, r]) => r >= 0)
     .map(([a, r]) => `${a} = ${rowTerms(r)}`).join('<br>');
   $('cycleNow').textContent = P.cycleMode ? 'now turning: ' + (cycleNow.map(([i, j]) => `d${i + 1}–d${j + 1}`).join(' + ') || 'nothing (add a plane)') : '';
-  $('cReadout').innerHTML = `c = (${cNow.map(v => v.toFixed(3)).join(', ')})<br>slice w = ${(P.fSlice * head[4]).toFixed(3)} · one cycle = ${P.fBeats} beats${focus.bits.length ? `<br>focus depth <b>${focus.bits.length}</b> · zoom <b>×${Math.exp(focus.cur.lm).toFixed(1)}</b>` : ''}`;
+  $('cReadout').innerHTML = `c = (${cNow.map(v => v.toFixed(3)).join(', ')})<br>slice w = ${(P.fSlice * head[4]).toFixed(3)} · one cycle = ${P.fBeats} beats${focus.vD !== null ? `<br>voyage depth <b>${focus.vD.toFixed(1)}</b> · zoom <b>×${Math.exp(focus.cur.lm).toFixed(1)}</b> · back at the surface in <b>${Math.ceil(focus.vLeft)}</b> beats` : focus.bits.length ? `<br>focus depth <b>${focus.bits.length}</b> · zoom <b>×${Math.exp(focus.cur.lm).toFixed(1)}</b>` : ''}`;
   const s = scenes[editing];
   s.turns.forEach((n, k) => { const el = $('hs' + k); if (el) el.textContent = (n / P.fBeats + s.drift[k]).toFixed(3); });
 }
@@ -1178,7 +1197,7 @@ slider('speeds', 'traceBeats', 'Trace length (beats)', 1, 512, 1);
 for (let k = 1; k <= 8; k++) slider('speeds', 'v' + k, `θ${k} speed`, -0.5, 0.5, 0.001, v => (v > 0 ? '+' : '') + v + ' c/beat');
 slider('cycle', 'glide', 'Glide', 0, 1, 0.01, v => Math.round(v * 100) + '% of step');
 slider('cycle', 'cycleSpeed', 'Every-plane speed', -45, 45, 0.5, deg);
-for (const [id, key] of [['cycleMode', 'cycleMode'], ['cycleEvery', 'cycleEvery'], ['trace', 'trace']]) {
+for (const [id, key] of [['cycleMode', 'cycleMode'], ['cycleEvery', 'cycleEvery'], ['trace', 'trace'], ['fVoyage', 'fVoyage']]) {
   sliders.push(() => { $(id).value = P[key]; });
   $(id).onchange = e => { P[key] = Number(e.target.value); markShow(-1); save(); };
 }
