@@ -365,7 +365,7 @@ function setup(src) {
   P = { ...BASE, ...(src.look || src.P || {}), bpm: P ? P.bpm : 120, auto: P ? P.auto : true };
   P.rots = cleanRots(src.rots || (src.P && src.P.rots) || BASE.rots);
   P.links = (src.links || (src.look && src.look.links) || (src.P && src.P.links) || []).slice(0, 12).map(l => ({
-    band: Math.min(BANDS.length - 1, Math.max(0, l.band | 0)), key: String(l.key), depth: Math.min(1, Math.max(-1, Number(l.depth) || 0)),
+    band: Math.min(7, Math.max(0, l.band | 0))   /* 8 bands; BANDS isn't defined yet when a saved show loads */, key: String(l.key), depth: Math.min(1, Math.max(-1, Number(l.depth) || 0)),
   }));
   P.lfos = (src.lfos || (src.look && src.look.lfos) || (src.P && src.P.lfos) || []).slice(0, 12).map(l => ({
     key: String(l.key), shape: LFO_SHAPES[l.shape] ? l.shape : 'sine',
@@ -822,13 +822,13 @@ const mBuf = new Float32Array(16);
 // k-step derivative ∏ 2|z| the set around it is a scaled copy of the whole. Kleinian: the k-th translate of the
 // cell, inverted back toward the pinch, where copies shrink like 1/|p|². Head-coordinate signs pick the branches.
 const csqrt = (x, y) => { const r = Math.hypot(x, y), t = Math.sqrt(Math.max(0, (r - x) / 2)); return [Math.sqrt((r + x) / 2), y < 0 ? -t : t]; };
-function focusPoint(bits, c, u, kc, T1, T2) {
+function focusPoint(bits, c, u, kc, T1, T2, kRot) {
   const k = bits.length;
   if (!k) return { F: [0, 0, 0, 0], lm: 0 };
   if (P.fType === 1) {
     const p = [1.5 - kc[0], -kc[1], bits[0] * (k + 0.5) * T1 - kc[2], (bits[1] > 0 ? 0.5 * (T2 || 2) : 0) - kc[3]];
     const r2 = p.reduce((a, v) => a + v * v, 0);
-    const F = p.map(v => v / r2), kRot = Math.min(12, Math.max(1, Math.abs(P.fK || 1))), e = 1e-5;
+    const F = p.map(v => v / r2), e = 1e-5;
     for (let i = 0; i < 12; i++) {   // step onto the nearest surface along the distance gradient
       const d = deK4(F, kc, T1, T2, kRot), g = F.map((_, j) => { const G = [...F]; G[j] += e; return (deK4(G, kc, T1, T2, kRot) - d) / e; }), gl = Math.hypot(...g) || 1;
       if (d < 1e-6) break;
@@ -965,13 +965,12 @@ function frame(now) {
   const KC = [0.5 * head[0], 0.5 * head[1], 0.5 * T1 * head[2], 0.5 * (T2 || 2) * head[3]];
   // Focus: retarget when the head's signs change (at most every 2 beats); glide there, zooming out on the way
   // just enough to keep both points in view.
-  P.fK = n[0];
   const kDepth = Math.min(10, Math.round(P.fFocus * n.length));
   const bits = Array.from({ length: kDepth }, (_, i) => head[i % (n.length + 1)] < 0 ? -1 : 1), key = P.fType + bits.join('');
   focus.s = Math.min(1, focus.s + dB / 2);
   if (key !== focus.key && (focus.s >= 1 || !focus.from)) { focus.key = key; focus.bits = bits; focus.from = focus.cur; focus.s = 0; }
   {
-    const to = focusPoint(focus.bits, [kr, ki], [1 / ul, head[2] / ul, head[3] / ul], KC, T1, T2), fr = focus.from || to;
+    const to = focusPoint(focus.bits, [kr, ki], [1 / ul, head[2] / ul, head[3] / ul], KC, T1, T2, Math.min(12, Math.max(1, Math.abs(n[0])))), fr = focus.from || to;
     const e = focus.s * focus.s * (3 - 2 * focus.s), d = Math.hypot(...to.F.map((v, i) => v - fr.F[i]));
     const dip = Math.max(0, (fr.lm + to.lm) / 2 - Math.log(P.fZoom / Math.max(d, 1e-6))) * Math.sin(Math.PI * e);
     focus.cur = { F: fr.F.map((v, i) => v + (to.F[i] - v) * e), lm: fr.lm + (to.lm - fr.lm) * e - dip };
