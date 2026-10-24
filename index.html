@@ -343,6 +343,15 @@ const SHOWS = [
     scenes: [sc([3, 2], [0.065, 0.15], 16, 4),sc([2, 3, 5], [0, 0.0625, -0.125], 32, 4),sc([3, 5, 7, 11], [0.085, 0.05, 0.1, -0.08], 16, 3),sc([3, 5, 7, 11, 13], [0.065, 0.05, 0.105, -0.14, 0.12], 16, 4),sc([1, -2, 3, -5, 8, -13], [0, 0.02, -0.04, 0.06, -0.1, 0.16], 16, 4),sc([3, 2, 1, 2, 7, 5, 11, 8], [0.065, 0.15, 0.155, 0.115, 27, 5, 7, 3], 16, 4),sc([-3, 1, 2, 4, 4, 9, 7, 23], [0.065, 0.15, 0.01, 3, 7, -23, 0.055, 23], 16, 4)] },
   { name: 'Solstice', blurb: 'long trails, 9D → cardioid', P: {"hueDim": 5, "litDim": 3, "hueStep": -12, "hueRange": 90, "tilt": 80, "persp": 0.1, "depthFade": 0.8, "mesh": 0.4, "pulse": 0.03, "size": 1.6, "gain": 2.4, "exposure": 1.2, "fbMode": 1, "decay": 0.93, "zoom": 0.97, "fbRot": -8, "seg": 5, "ifsN": 5, "ifsS": 0.38, "ifsOff": 0.55, "ifsSpin": -6, "fractal": 0.6, "fType": 0, "fSolid": 0.15, "fZoom": 2.4, "fScale": 1.12, "fBeats": 12, "fSlice": 0.3, "rots": [[1, 2, 6], [2, 3, -4], [3, 4, 12], [4, 5, -2.5], [5, 6, 8], [6, 7, -15], [7, 8, 3], [3, 7, 20]], "lfos": [{"key": "tilt", "shape": "triangle", "period": 64, "depth": 0.35}, {"key": "persp", "shape": "square", "period": 16, "depth": 0.4}, {"key": "pulse", "shape": "saw", "period": 1, "depth": 0.15}, {"key": "hueRange", "shape": "triangle", "period": 32, "depth": 0.5}, {"key": "size", "shape": "square", "period": 2, "depth": 0.25}, {"key": "gain", "shape": "saw", "period": 4, "depth": 0.3}, {"key": "decay", "shape": "triangle", "period": 8, "depth": 0.06}, {"key": "fScale", "shape": "sine", "period": 16, "depth": 0.2}, {"key": "fSlice", "shape": "triangle", "period": 4, "depth": 0.5}, {"key": "glide", "shape": "saw", "period": 32, "depth": 0.8}, {"key": "seg", "shape": "square", "period": 32, "depth": 0.4}, {"key": "zoom", "shape": "triangle", "period": 16, "depth": 0.12}], "links": [{"band": 0, "key": "tilt", "depth": -0.2}, {"band": 1, "key": "fSolid", "depth": 0.5}, {"band": 1, "key": "size", "depth": 0.3}, {"band": 2, "key": "fbRot", "depth": 0.35}, {"band": 3, "key": "fSlice", "depth": -0.4}, {"band": 4, "key": "exposure", "depth": 0.3}, {"band": 5, "key": "mesh", "depth": 0.5}, {"band": 5, "key": "hueStep", "depth": -0.6}, {"band": 0, "key": "decay", "depth": 0.05}], "audioResp": 0.75, "cycleMode": 2, "cycleEvery": 2, "glide": 0.6, "cycleSpeed": 20},
     scenes: [sc([2, 4, 6, 8, 10, 12, 14, 16], [0, 0.01, -0.02, 0.03, -0.04, 0.05, -0.06, 0.07], 24, 8),sc([5, -3, 4, -1, 6, -2, 3], [0, 0.125, 0.25, -0.125, 0.5, -0.25, 0.0625], 12, 2),sc([7, 1, 7, 1, 7, 1], [0.03, 0, -0.03, 0, 0.03, 0], 48, 12),sc([12, 1, 1, 1], [0, 1.5, -1.5, 0.75], 8, 1),sc([6, 4, 2], [0.25, -0.5, 1], 16, 4),sc([1, 9], [0, 0.33], 32, 16),sc([4, 4], [0.02, -0.02], 8, 6)] },
+  { name: 'Beat background', blurb: 'horn-torus fractal echoes, 3D → 9D', P: {"hueDim": -2, "litDim": -2, "hueStep": -31, "hueRange": 180, "tilt": 15, "persp": 0, "depthFade": 0.47, "mesh": 0.18, "pulse": 0.07, "size": 5.2, "gain": 0.95, "exposure": 1.25, "fbMode": 2, "decay": 0.31, "zoom": 0.998, "fbRot": -9, "seg": 3, "ifsN": 6, "ifsS": 0.57, "ifsOff": 0.29, "ifsSpin": -8, "fractal": 0.64, "fType": 2, "fSolid": 0.67, "fZoom": 0.85, "fScale": 0.6, "fBeats": 45, "fSlice": 0.49, "fFocus": 0.3, "trace": 0, "traceBeats": 1, "v1": 0, "v2": 0, "v3": 0, "v4": 0, "v5": 0, "v6": 0, "v7": 0, "v8": 0, "rots": [[0, 1, -9], [0, 2, 5], [0, 3, 5], [0, 4, 10], [0, 5, 45], [2, 6, 5], [1, 8, -19.5], [4, 8, 5]], "lfos": [{"key": "fbRot", "shape": "sine", "period": 32, "depth": 0.74}, {"key": "depthFade", "shape": "sine", "period": 32, "depth": 0.61}, {"key": "hueStep", "shape": "sine", "period": 64, "depth": 0.52}, {"key": "mesh", "shape": "triangle", "period": 8, "depth": 0.28}, {"key": "ifsSpin", "shape": "sine", "period": 64, "depth": 0.83}, {"key": "fSlice", "shape": "sine", "period": 16, "depth": 0.55}, {"key": "fFocus", "shape": "sine", "period": 64, "depth": 0.23}], "links": [{"band": 3, "key": "fZoom", "depth": 0.19}, {"band": 1, "key": "pulse", "depth": 0.43}, {"band": 4, "key": "fractal", "depth": 0.31}, {"band": 7, "key": "seg", "depth": 1}, {"band": 7, "key": "ifsS", "depth": 0.39}, {"band": 3, "key": "hueRange", "depth": 0.5}, {"band": 6, "key": "gain", "depth": 0.3}, {"band": 4, "key": "hueStep", "depth": 0.81}, {"band": 0, "key": "ifsSpin", "depth": 0.15}, {"band": 2, "key": "fBeats", "depth": 0.36}, {"band": 7, "key": "ifsN", "depth": 0.43}, {"band": 7, "key": "decay", "depth": -0.12}, {"band": 7, "key": "traceBeats", "depth": 1}, {"band": 6, "key": "ifsOff", "depth": 0.16}, {"band": 1, "key": "v1", "depth": 0.25}, {"band": 2, "key": "v2", "depth": 0.41}, {"band": 3, "key": "v3", "depth": 0.81}, {"band": 4, "key": "v4", "depth": 0.25}, {"band": 5, "key": "v5", "depth": 0.25}, {"band": 5, "key": "hueStep", "depth": 0.31}, {"band": 5, "key": "exposure", "depth": 0.14}], "audioResp": 0.29, "cycleMode": 1, "cycleEvery": 32, "glide": 0.34, "cycleSpeed": 0.5},
+    scenes: [sc([1, 2], [0, 0], 32, 4),
+sc([2, 3, 5], [0, 0, 0], 32, 4),
+sc([3, 5, 7, 11], [0, 0, 0, 0], 32, 3),
+sc([3, 5, 7, 11, 13], [0, 0, 0, 0, 0], 32, 4),
+sc([1, -2, 3, -5, 8, -13], [0, 0, 0, 0, 0, 0], 32, 4),
+sc([3, 2, 1, 2, 7, 5, 11], [0, 0, 0, 0, 0, 0, 0], 32, 4),
+sc([-1, 1, -1, 1, 1, -1, 1, -1], [0, 0, 0, 0, 0, 0, 0, 0], 32, 4),
+sc([1, 2, 3, 5, 7, 11, 13, 17], [0, 0, 0, 0, 0, 0, 0, 0], 32, 3)] },
 ];
 
 // Oscillator shapes: phase x in beats/period, output in [-1, 1].
@@ -681,10 +690,10 @@ void main() {
     // Hue: the fractal's 4th coordinate (like the loop's hidden axes) plus orbit-trap bands for surface detail.
     float tr = clamp(sqrt(trap), 0., 1.);
     float hue = uHueBase + uHueRange * (.5 + .5 * tanh(w * 1.5)) + 140. * tr;
-    vec3 base = hsl(hue, .8, .3 + .32 * (1. - tr));
+    vec3 base = hsl(hue, .9, .3 + .32 * (1. - tr));
     float diff = max(dot(n, -lw), 0.), fill = max(dot(n, lw), 0.), rim = pow(1. - abs(dot(n, rd)), 3.);
     float ao = clamp(1. - steps / 70., .15, 1.);                 // crevices take more steps: darker
-    col = (base * (.1 + .9 * diff) + hsl(hue + 180., .7, .4) * fill * .35 + base * rim * .5
+    col = (base * (.12 + .9 * diff + .3 * fill) + base * rim * .5
            + pow(max(dot(reflect(rd, n), -lw), 0.), 24.) * .4) * ao;
     vec3 edge = (base * rim * 1.6 + hsl(hue, .9, .62) * pow(rim, 6.) * .8) * ao;   // outline only
     col = mix(edge, col, uSolid);
@@ -778,9 +787,10 @@ function target(w, h) {
 }
 let W = 0, H = 0, RS = 1, curveT, fractT, fbs, fractStale = true;
 // Adaptive quality: if frames run slow, render fewer pixels; when there is headroom, step back up. Checked once a second.
-// First step down: redraw the background fractal every other frame. Then lower the resolution.
+// First steps down: render the background fractal at half resolution, then redraw it every other frame.
+// Then lower the resolution of everything.
 // Stepping back up waits for 3 fast seconds in a row, so it doesn't flip back and forth.
-const quality = { scale: 1, fractalEvery: 1, ema: 1 / 60, next: 0, fast: 0, frame: 0 };
+const quality = { scale: 1, fractalDiv: 1, fractalEvery: 1, ema: 1 / 60, next: 0, fast: 0, frame: 0 };
 function adaptQuality(now, dt) {
   quality.ema += (dt - quality.ema) * 0.1;
   quality.frame++;
@@ -788,21 +798,23 @@ function adaptQuality(now, dt) {
   quality.next = now + 1000;
   if (quality.ema > 1 / 48) {
     quality.fast = 0;
-    if (P.fractal > 0 && quality.fractalEvery === 1) quality.fractalEvery = 2;
+    if (P.fractal > 0 && P.fType < 2 && quality.fractalDiv === 1) quality.fractalDiv = 2;
+    else if (P.fractal > 0 && quality.fractalEvery === 1) quality.fractalEvery = 2;
     else if (quality.scale > 0.5) quality.scale = Math.max(0.5, quality.scale * 0.85);
   } else if (quality.ema < 1 / 57 && ++quality.fast >= 3) {
     quality.fast = 0;
     if (quality.scale < 1) quality.scale = Math.min(1, quality.scale * 1.1);
     else if (quality.fractalEvery === 2) quality.fractalEvery = 1;
+    else if (quality.fractalDiv === 2) quality.fractalDiv = 1;
   }
 }
 function resize() {
   RS = Math.min(devicePixelRatio || 1, 1.5) * quality.scale;
   const w = Math.max(2, Math.round(cv.clientWidth * RS)), h = Math.max(2, Math.round(cv.clientHeight * RS));
-  if (w === W && h === H) return;
+  if (w === W && h === H && fractT.w === Math.ceil(W / quality.fractalDiv)) return;
   W = cv.width = w; H = cv.height = h;
   for (const t of [curveT, fractT, ...(fbs || [])]) if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
-  curveT = target(W, H); fractT = target(Math.ceil(W / 2), Math.ceil(H / 2)); fractStale = true; fbs = [target(W, H), target(W, H)];
+  curveT = target(W, H); fractT = target(Math.ceil(W / quality.fractalDiv), Math.ceil(H / quality.fractalDiv)); fractStale = true; fbs = [target(W, H), target(W, H)];
 }
 
 // ---------- clock & sequencing ----------
@@ -1030,7 +1042,10 @@ function frame(now) {
     gl.uniform1i(f.uKind, P.fType - 2); gl.uniform1i(f.uD, D); gl.uniform1i(f.uMaps, 2 * Nk);
     gl.uniform1fv(f.uTh, thBuf); gl.uniform1fv(f.uCz, czBuf); gl.uniform2f(f.uBeta, (1 + sx) / 2, sy / 2);
     gl.uniform1f(f.uScaleF, (P.fType === 3 ? 0.6 : 1) * 1.7 / P.fZoom);
-    gl.uniform1f(f.uSize, Math.max(1, size * 0.6)); gl.uniform1f(f.uAlpha, P.fractal * P.gain * 0.12);
+    // Small fixed-size dots keep the cloud's detail sharp (the curve's dot size would blur it); alpha makes up
+    // the lost area so the overall brightness stays the same.
+    const ptSize = 1.6 * RS, ptOld = Math.max(1, size * 0.6);
+    gl.uniform1f(f.uSize, ptSize); gl.uniform1f(f.uAlpha, P.fractal * P.gain * 0.12 * Math.min(4, (ptOld / ptSize) ** 2));
     gl.uniform1i(f.uHueDim, P.hueDim); gl.uniform1i(f.uLitDim, P.litDim);
     gl.uniform1f(f.uHueBase, view.hue); gl.uniform1f(f.uHueRange, P.hueRange);
     gl.drawArrays(gl.POINTS, 0, Math.round(FRACT_POINTS * quality.scale * quality.scale));
@@ -1109,7 +1124,7 @@ function readout(S, m) {
   const status = seq.from === seq.to
     ? `holding scene <b>${seq.from + 1}</b>, ${Math.max(0, Math.ceil(seq.holdStart + scenes[seq.from].hold - clock.beat))} beats left`
     : `morphing <b>${seq.from + 1} → ${seq.to + 1}</b> ${Math.round(m * 100)}%`;
-  $('readout').innerHTML = `${status}<br>dimension <b>${A.turns.length + 1}</b>${B !== A ? ` → <b>${B.turns.length + 1}</b>` : ''} · gcd <b>${g}</b>${g > 1 ? ` (retraces ${g}×)` : ''}${Q !== 1 ? ` · closes after <b>${+Q.toFixed(2)}</b> trips` : ''}<br>points <b>${S.toLocaleString()}</b> · render <b>${Math.round(quality.scale * 100)}%</b>${quality.fractalEvery > 1 ? ' · fractal every 2nd frame' : ''} · beat <b>${Math.floor(clock.beat)}</b>`;
+  $('readout').innerHTML = `${status}<br>dimension <b>${A.turns.length + 1}</b>${B !== A ? ` → <b>${B.turns.length + 1}</b>` : ''} · gcd <b>${g}</b>${g > 1 ? ` (retraces ${g}×)` : ''}${Q !== 1 ? ` · closes after <b>${+Q.toFixed(2)}</b> trips` : ''}<br>points <b>${S.toLocaleString()}</b> · render <b>${Math.round(quality.scale * 100)}%</b>${quality.fractalDiv > 1 && P.fType < 2 ? ' · fractal at half resolution' : ''}${quality.fractalEvery > 1 ? ' · fractal every 2nd frame' : ''} · beat <b>${Math.floor(clock.beat)}</b>`;
   const N = Math.max(scenes[seq.from].turns.length, scenes[seq.to].turns.length);
   const hd = P.hueDim === -2 ? (N >= 3 ? 3 : -1) : P.hueDim, ld = P.litDim === -2 ? (N >= 4 ? 4 : -1) : P.litDim;
   $('projNow').innerHTML = [['x', 0], ['y', 1], ['z', 2], ['hue', hd], ['light', ld]].filter(([, r]) => r >= 0)
