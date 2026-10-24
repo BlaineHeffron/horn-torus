@@ -222,8 +222,9 @@ body.presenting.awake #exitShow { display: block; }
       <div class="body">
         <p class="hint">A quaternion Julia set q → q² + c, ray-marched through the same picture rotations and camera. Its constant c comes from the head point. The head's angle around the ring walks c along the edge of the Mandelbrot set's main cardioid, where Julia sets have the most detail. Its distance from the axis sets how close c sits to that edge, and its d3 and d4 tilt c's imaginary part into the quaternion j and k axes. So the fractal cycles when the loop does. The head's d5 slides the 3D slice through the fourth axis. Color is the fractal's fourth coordinate, the same way the loop's hidden axes are colored.</p>
         <div class="ctl"><span>Formula</span>
-          <select id="fType" aria-label="Fractal formula"><option value="0">Quaternion Julia</option><option value="1">Kleinian (sphere inversions)</option></select><span></span></div>
+          <select id="fType" aria-label="Fractal formula"><option value="0">Quaternion Julia</option><option value="1">Kleinian (sphere inversions)</option><option value="2">Horn-torus fractal (points)</option><option value="3">Julia (points, scene dimension)</option></select><span></span></div>
         <p class="hint" id="kHint">Kleinian: the horn torus inverted through its pinch is a cylinder. The fractal is that cylinder's orbit under a translation along its axis (tube turns set the period), a k-fold rotation (k = ring turns), a second translation for 3+ angles, and one inversion sphere that the head steers, all inverted back. Every piece is a Möbius image of the horn torus, and they pile up at the pinch. Edge distance sets the sphere's size.</p>
+        <p class="hint" id="pHint">Point fractals are drawn like the curve: same 9D space, picture rotations, camera and hidden-axis colors, and they run through the trails and kaleidoscope. <b>Horn-torus fractal</b>: each nesting level of the torus is the map p → ½(±shift + rotate<sub>k</sub>(±θ<sub>k</sub>) p) in plane d1–d<sub>k+2</sub>. Applying those maps in every order gives a horn torus of horn tori, with the head's current angles θ<sub>k</sub>, so it moves with the loop. <b>Julia</b>: points from running z → ±√(z − c) backward in the scene's dimension, with c from the head. Fractal mix is brightness, zoom is size, and Solidity, d5 slice and Focus don't apply.</p>
         <div class="body flat" id="fractal"></div>
         <div class="readout" id="cReadout"></div>
       </div>
@@ -483,6 +484,63 @@ void main() {
   float lit = ld < 0 ? .55 : .5 + .18 * rowDot(ld, q);
   vCol = uHead > .5 ? vec4(1.) : vec4(hsl(hue, .9, lit), uAlpha * fade(depth) * mix(1., t / 6.28318530718, uTrail));
 }`;
+// Point-cloud fractals in the curve's space. Each vertex picks a random branch at every level (hash of its id),
+// so the cloud samples the whole attractor at depth 12-16 rather than a shallow complete tree.
+const FRACT_POINTS = 160000;
+const PTS_VS = `#version 300 es
+precision highp float;
+uniform int uKind; uniform int uD; uniform int uMaps; uniform float uTh[8]; uniform float uCz[9]; uniform vec2 uBeta;
+uniform float uScaleF; uniform float uSize; uniform float uAlpha;
+uniform int uHueDim; uniform int uLitDim; uniform float uHueBase; uniform float uHueRange;
+out vec4 vCol;
+${HSL}
+${CAMERA}
+uint hsh(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+void main() {
+  float p[9]; for (int i = 0; i < 9; i++) p[i] = 0.;
+  uint id = uint(gl_VertexID), h = hsh(id + 1u);
+  float top = 0.;
+  if (uKind == 0) {
+    // Horn-torus IFS: level map k (k = 0 ring, k >= 1 tube k) is p -> (s·e1 + R(s·θk) p) / 2 in plane d1–d(k+2).
+    for (int l = 0; l < 14; l++) {
+      h = hsh(h);
+      int dg = int(h % uint(uMaps)), k = dg / 2, j = k + 1;
+      float s = dg % 2 == 0 ? 1. : -1., c = cos(s * uTh[k]), sn = sin(s * uTh[k]), x = p[0], y = p[j];
+      for (int i = 0; i < 9; i++) p[i] *= .5;
+      p[0] = .5 * (s + c * x - sn * y); p[j] = .5 * (sn * x + c * y);
+      top = float(dg) / float(uMaps);
+    }
+  } else {
+    // Julia by inverse iteration in D dims, with z² = (x0² − |v|², 2 x0 v) (the quaternion square, any dimension).
+    // Start at β turned to a random imaginary direction (the set is symmetric about c's axis), then take
+    // random square-root branches; every step lands closer to the Julia set.
+    float vl = 0.;
+    for (int i = 1; i < 9; i++) { h = hsh(h); p[i] = i < uD ? float(h) / 4294967295. - .5 : 0.; vl += p[i] * p[i]; }
+    vl = sqrt(max(vl, 1e-12));
+    for (int i = 1; i < 9; i++) p[i] *= abs(uBeta.y) / vl;
+    p[0] = uBeta.x;
+    for (int l = 0; l < 16; l++) {
+      float w0 = p[0] - uCz[0], wv = 0.;
+      for (int i = 1; i < 9; i++) { p[i] -= uCz[i]; wv += p[i] * p[i]; }
+      wv = sqrt(wv);
+      float r = sqrt(w0 * w0 + wv * wv), a = sqrt(max(0., (r + w0) * .5)), b = sqrt(max(0., (r - w0) * .5));
+      h = hsh(h); float s = (h & 1u) == 0u ? 1. : -1.;
+      for (int i = 1; i < 9; i++) p[i] *= s * b / max(wv, 1e-12);
+      p[0] = s * a;
+      top = s > 0. ? 0. : .5;
+    }
+  }
+  float q[9];
+  for (int i = 0; i < 9; i++) { q[i] = p[i]; p[i] *= uScaleF; }
+  float depth;
+  gl_Position = cam(vec3(rowDot(0, p), rowDot(1, p), rowDot(2, p)), depth);
+  gl_PointSize = uSize;
+  int hd = uHueDim == -2 ? (uD >= 4 ? 3 : -1) : uHueDim;
+  int ld = uLitDim == -2 ? (uD >= 5 ? 4 : -1) : uLitDim;
+  float hue = hd < 0 ? uHueBase + 360. * top : uHueBase + uHueRange * clamp(rowDot(hd, q) * .5 + .5, 0., 1.);
+  float lit = ld < 0 ? .55 : .5 + .18 * clamp(rowDot(ld, q), -1., 1.);
+  vCol = vec4(hsl(hue, .9, lit), uAlpha * fade(depth));
+}`;
 const POINT_FS = `#version 300 es
 precision highp float;
 in vec4 vCol; out vec4 o;
@@ -688,6 +746,7 @@ function program(vs, fs) {
   for (let i = 0; i < n; i++) { const name = gl.getActiveUniform(p, i).name.replace('[0]', ''); u[name] = gl.getUniformLocation(p, name); }
   return { p, u };
 }
+const ptsProg = program(PTS_VS, POINT_FS), thBuf = new Float32Array(8), czBuf = new Float32Array(9);
 const curveProg = program(CURVE_VS, POINT_FS), meshProg = program(MESH_VS, MESH_FS), fractProg = program(QUAD_VS, FRACT_FS);
 const compProg = program(QUAD_VS, COMP_FS), presentProg = program(QUAD_VS, PRESENT_FS);
 gl.bindVertexArray(gl.createVertexArray());
@@ -920,7 +979,15 @@ function frame(now) {
   hornTorus(tH, padB, phB, B.turns.length, tmpB);
   for (let i = 0; i < 9; i++) head[i] = (tmpA[i] * (1 - m) + tmpB[i] * m) * (i >= 2 ? Math.pow(2, i - 1) : 1);
 
-  // 1. wireframe + curve + head → curve buffer (additive)
+  // Head ring angle walks the Mandelbrot main-cardioid edge, c(φ) = e^{iφ}/2 − e^{2iφ}/4 (where Julia sets are richest);
+  // its radius moves c slightly across the edge; d3, d4 tilt the imaginary part into the quaternion j, k axes.
+  // Staying close to the edge keeps the set from swelling into a solid lump.
+  const phi = Math.atan2(head[1], head[0]), kk = P.fScale * (0.97 + 0.08 * Math.hypot(head[0], head[1]));
+  const kr = kk * (0.5 * Math.cos(phi) - 0.25 * Math.cos(2 * phi)), ki = kk * (0.5 * Math.sin(phi) - 0.25 * Math.sin(2 * phi));
+  const ul = Math.hypot(1, head[2], head[3]);
+  cNow = [kr, ki / ul, ki * head[2] / ul, ki * head[3] / ul];
+
+  // 1. wireframe + curve + head (+ point-cloud fractal) → curve buffer (additive)
   gl.bindFramebuffer(gl.FRAMEBUFFER, curveT.fb); gl.viewport(0, 0, W, H);
   gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
@@ -938,6 +1005,22 @@ function frame(now) {
   gl.uniform1f(cu.uHueBase, view.hue); gl.uniform1f(cu.uHueRange, P.hueRange);
   gl.uniform1f(cu.uHead, 0); gl.drawArrays(gl.POINTS, 0, S + 1);
   if (P.fractal > 0) { gl.uniform1f(cu.uHead, 1); gl.uniform1f(cu.uHeadT, tH); gl.drawArrays(gl.POINTS, 0, 1); }
+  if (P.fractal > 0 && P.fType >= 2) {   // point-cloud fractals live in the curve's 9D space and go through feedback
+    const Kn = m < 0.5 ? padA : padB, Kp = m < 0.5 ? phA : phB, Nk = (m < 0.5 ? A : B).turns.length, D = Nk + 1;
+    for (let i = 0; i < 8; i++) thBuf[i] = Kn[i] * tH + Kp[i];   // the head's current angles
+    // Julia c in D dims: (kr, ki·u), u along (1, d3, d4, ...) of the head (same as the 4D formula for D = 4).
+    const u = [0, 1, ...Array.from({ length: D - 2 }, (_, i) => head[i + 2] * Math.min(1, 2 ** (1 - i)))], ulD = Math.hypot(...u);
+    czBuf.fill(0); czBuf[0] = kr; for (let i = 1; i < D; i++) czBuf[i] = ki * u[i] / ulD;
+    const [sx, sy] = csqrt(1 - 4 * kr, -4 * ki);   // repelling fixed point β = (1 + √(1 − 4c)) / 2: inverse iteration starts on the set
+    const f = ptsProg.u; gl.useProgram(ptsProg.p); camera(f);
+    gl.uniform1i(f.uKind, P.fType - 2); gl.uniform1i(f.uD, D); gl.uniform1i(f.uMaps, 2 * Nk);
+    gl.uniform1fv(f.uTh, thBuf); gl.uniform1fv(f.uCz, czBuf); gl.uniform2f(f.uBeta, (1 + sx) / 2, sy / 2);
+    gl.uniform1f(f.uScaleF, (P.fType === 3 ? 0.6 : 1) * 1.7 / P.fZoom);
+    gl.uniform1f(f.uSize, Math.max(1, size * 0.6)); gl.uniform1f(f.uAlpha, P.fractal * P.gain * 0.12);
+    gl.uniform1i(f.uHueDim, P.hueDim); gl.uniform1i(f.uLitDim, P.litDim);
+    gl.uniform1f(f.uHueBase, view.hue); gl.uniform1f(f.uHueRange, P.hueRange);
+    gl.drawArrays(gl.POINTS, 0, Math.round(FRACT_POINTS * quality.scale * quality.scale));
+  }
   gl.disable(gl.BLEND);
 
   // 2. feedback composite → ping-pong
@@ -954,13 +1037,6 @@ function frame(now) {
   fbs.reverse();
 
   // 3. 4D fractal (half resolution)
-  // Head ring angle walks the Mandelbrot main-cardioid edge, c(φ) = e^{iφ}/2 − e^{2iφ}/4 (where Julia sets are richest);
-  // its radius moves c slightly across the edge; d3, d4 tilt the imaginary part into the quaternion j, k axes.
-  // Staying close to the edge keeps the set from swelling into a solid lump.
-  const phi = Math.atan2(head[1], head[0]), kk = P.fScale * (0.97 + 0.08 * Math.hypot(head[0], head[1]));
-  const kr = kk * (0.5 * Math.cos(phi) - 0.25 * Math.cos(2 * phi)), ki = kk * (0.5 * Math.sin(phi) - 0.25 * Math.sin(2 * phi));
-  const ul = Math.hypot(1, head[2], head[3]);
-  cNow = [kr, ki / ul, ki * head[2] / ul, ki * head[3] / ul];
   const K = m < 0.5 ? A : B, n = K.turns;
   const T1 = 2 * Math.max(1, Math.abs(n[1] || 1)) / 2, T2 = n.length > 2 ? Math.max(1, Math.abs(n[2])) : 0;
   const KC = [0.5 * head[0], 0.5 * head[1], 0.5 * T1 * head[2], 0.5 * (T2 || 2) * head[3]];
@@ -976,7 +1052,7 @@ function frame(now) {
     const dip = Math.max(0, (fr.lm + to.lm) / 2 - Math.log(P.fZoom / Math.max(d, 1e-6))) * Math.sin(Math.PI * e);
     focus.cur = { F: fr.F.map((v, i) => v + (to.F[i] - v) * e), lm: fr.lm + (to.lm - fr.lm) * e - dip };
   }
-  if (P.fractal > 0 && (quality.frame % quality.fractalEvery === 0 || fractStale)) {
+  if (P.fractal > 0 && P.fType < 2 && (quality.frame % quality.fractalEvery === 0 || fractStale)) {
     fractStale = false;
     gl.bindFramebuffer(gl.FRAMEBUFFER, fractT.fb); gl.viewport(0, 0, fractT.w, fractT.h);
     const f = fractProg.u; gl.useProgram(fractProg.p);
@@ -1004,7 +1080,7 @@ function frame(now) {
   const pu = presentProg.u; gl.useProgram(presentProg.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, dst.tex); gl.uniform1i(pu.uTex, 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fractT.tex); gl.uniform1i(pu.uFrac, 1);
-  gl.uniform1f(pu.uExposure, P.exposure * (1 + pulse)); gl.uniform1f(pu.uFracMix, P.fractal);
+  gl.uniform1f(pu.uExposure, P.exposure * (1 + pulse)); gl.uniform1f(pu.uFracMix, P.fType < 2 ? P.fractal : 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   const bi = Math.floor(clock.beat);
@@ -1093,8 +1169,8 @@ function dimSelect(id, key, extra) {
 }
 dimSelect('hueDim', 'hueDim', [[-2, 'auto (first hidden)'], [-1, 'position along loop']]);
 dimSelect('litDim', 'litDim', [[-1, 'constant'], [-2, 'auto (second hidden)']]);
-sliders.push(() => { $('fType').value = P.fType; $('kHint').hidden = P.fType !== 1; });
-$('fType').onchange = e => { P.fType = Number(e.target.value); $('kHint').hidden = P.fType !== 1; markShow(-1); save(); };
+sliders.push(() => { $('fType').value = P.fType; $('kHint').hidden = P.fType !== 1; $('pHint').hidden = P.fType < 2; });
+$('fType').onchange = e => { P.fType = Number(e.target.value); $('kHint').hidden = P.fType !== 1; $('pHint').hidden = P.fType < 2; markShow(-1); save(); };
 sliders.push(() => { $('fbMode').value = P.fbMode; $('auto').classList.toggle('on', P.auto); });
 $('fbMode').onchange = e => { P.fbMode = Number(e.target.value); save(); };
 
