@@ -1418,8 +1418,12 @@ function audioCtx() {
   ear.ctx.resume();
   return ear.ctx;
 }
-$('listen').onclick = async () => {
-  if (ear.stream) { attach(audioCtx().createGain(), false); ear.an = null; $('listen').classList.remove('on'); earStatus('Stopped listening.'); return; }
+$('listen').onclick = () => {
+  if (!ear.stream) return startListening();
+  attach(audioCtx().createGain(), false); ear.an = null; $('listen').classList.remove('on'); earStatus('Stopped listening.');
+};
+$('audioIn').onchange = () => { if (ear.stream) startListening(); };   // switch inputs while listening
+async function startListening() {
   try {
     const src = $('audioIn').value, raw = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
     let stream;
@@ -1434,14 +1438,16 @@ $('listen').onclick = async () => {
       listInputs();   // labels (and Linux "Monitor of …" sources) show once the mic is allowed
     }
     attach(audioCtx().createMediaStreamSource(stream), false); ear.stream = stream;
-    stream.getAudioTracks()[0].onended = () => { if (ear.stream === stream) $('listen').click(); };   // sharing stopped from the browser bar
-    $('listen').classList.add('on'); $('player').pause();
-    earStatus(`Listening to ${$('audioIn').selectedOptions[0].text.replace(/ \(.*/, '').toLowerCase()}. Give it about 8 seconds of music to lock the tempo.`);
+    const track = stream.getAudioTracks()[0];
+    track.onended = () => { if (ear.stream === stream) $('listen').click(); };   // sharing stopped from the browser bar
+    $('listen').classList.add('on'); $('player').pause(); ear.quiet = 0;
+    // Name the device the browser actually connected; it can differ from the one asked for.
+    earStatus(`Listening to ${track.label || $('audioIn').selectedOptions[0].text}. Give it about 8 seconds of music to lock the tempo.`);
   } catch (e) {
-    earStatus(e.name === 'NotAllowedError' ? 'Permission was declined.' : /share|Monitor/.test(e.message) ? e.message
+    earStatus(e.name === 'NotAllowedError' ? 'Permission was declined.' : e.name === 'OverconstrainedError' || e.name === 'NotFoundError' ? 'That input is not available any more. Pick another.' : /share|Monitor/.test(e.message) ? e.message
       : 'Audio input is not available here. Inside the Claude viewer, pages cannot listen: open the page directly (GitHub Pages or locally), or use "Analyze a track".');
   }
-};
+}
 // Input devices for "Listen to". Monitor sources on Linux (PulseAudio/PipeWire) carry what the computer is playing.
 async function listInputs() {
   try {
@@ -1499,6 +1505,8 @@ function listenStep(t, dt) {
   drawBands();
   if (flux === 0 && energy === 0) return;   // analyser has no new data yet
   ear.level = ear.level * 0.8 + 0.2 * Math.min(1, energy / ear.spec.length / 50);
+  if (ear.stream && (ear.quiet = ear.level < 0.02 ? (ear.quiet || 0) + dt : 0) > 6 && ear.quiet - dt <= 6)
+    earStatus(`No sound is coming from ${ear.stream.getAudioTracks()[0]?.label || 'this input'}. If music is playing, pick a different input under Listen to.`);
   $('lvl').style.width = (ear.level * 100).toFixed(0) + '%';
   ear.hist.push([t, flux]);
   while (ear.hist.length && ear.hist[0][0] < t - WINDOW) ear.hist.shift();
