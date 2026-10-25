@@ -230,7 +230,7 @@ body.presenting.awake #exitShow { display: block; }
         <div class="body flat" id="fractal"></div>
         <div class="ctl"><span>Focus path</span><select id="fVoyage" aria-label="Focus path">
           <option value="0">Hop between spots</option><option value="1">Voyage: one long dive</option></select><span></span></div>
-        <p class="hint"><b>Focus depth</b> zooms into the Julia or Kleinian set, one level per step, at a spot the head picks. <b>Hop</b> jumps to a new spot whenever the head's signs change. <b>Voyage</b> dives continuously: depth rises and falls once per closing period (cycle length × the trips the loop needs to close, so fractional turns make long voyages), and each new level's direction is taken from the head as the dive reaches it. Faster dimensions steer finer detail. Up to 16 levels; zoom stops at ×100,000, where the GPU's precision runs out.</p>
+        <p class="hint"><b>Focus depth</b> zooms into the Julia or Kleinian set, one level per step, at a spot the head picks. <b>Zoom pace</b> sets how slowly it moves. <b>Hop</b> glides to a new spot when the head's signs change, taking pace × depth beats. <b>Voyage</b> dives continuously at pace beats per level, then resurfaces; the dive lasts a whole number of closing periods (cycle length × the trips the loop needs to close, so fractional turns make long voyages), and each new level's direction is taken from the head as the dive reaches it. Faster dimensions steer finer detail. Up to 16 levels; zoom stops at ×100,000, where the GPU's precision runs out.</p>
         <div class="readout" id="cReadout"></div>
       </div>
     </details>
@@ -305,7 +305,7 @@ const BASE = {
   hueDim: -2, litDim: -2, hueStep: 2, hueRange: 280,
   tilt: 62, persp: 0.35, depthFade: 0.5, mesh: 0.35, pulse: 0.05, size: 2.5, gain: 1.2, exposure: 1.6,
   fbMode: 0, decay: 0.88, zoom: 1.02, fbRot: 3, seg: 1, ifsN: 3, ifsS: 0.5, ifsOff: 0.32, ifsSpin: 2,
-  fractal: 0, fType: 0, fSolid: 0.4, fZoom: 1.7, fScale: 1, fBeats: 16, fSlice: 0.5, fFocus: 0, fVoyage: 0,
+  fractal: 0, fType: 0, fSolid: 0.4, fZoom: 1.7, fScale: 1, fBeats: 16, fSlice: 0.5, fFocus: 0, fVoyage: 0, fPace: 8,
   trace: 0, traceBeats: 64, ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(k => ['v' + k, 0])),
   rots: [[0, 1, 3]], lfos: [], links: [], audioResp: 0.3, cycleMode: 0, cycleEvery: 8, glide: 0.25, cycleSpeed: 8,
 };
@@ -1079,7 +1079,7 @@ function frame(now) {
   const K = m < 0.5 ? A : B, n = K.turns;
   const T1 = 2 * Math.max(1, Math.abs(n[1] || 1)) / 2, T2 = n.length > 2 ? Math.max(1, Math.abs(n[2])) : 0;
   const KC = [0.5 * head[0], 0.5 * head[1], 0.5 * T1 * head[2], 0.5 * (T2 || 2) * head[3]];
-  // Focus: retarget when the head's signs change (at most every 2 beats); glide there, zooming out on the way
+  // Focus: retarget when the head's signs change (after the last glide ends); glide there, zooming out on the way
   // just enough to keep both points in view.
   const kDepth = Math.min(P.fVoyage ? 16 : 10, Math.round(P.fFocus * n.length));
   const fp = b => focusPoint(b, [kr, ki], [1 / ul, head[2] / ul, head[3] / ul], KC, T1, T2, Math.min(12, Math.max(1, Math.round(Math.abs(n[0])))));
@@ -1089,7 +1089,7 @@ function frame(now) {
     // Voyage: depth rises and falls once per closing period (Q trips × cycle length). Each level's branch is the
     // head's sign when the dive reaches it, so the trajectory steers the route; a new level only refines the view
     // (the deeper point lies inside the current one), so there are no jumps. Resurfacing forgets those levels.
-    const V = Q * P.fBeats, ph = (((clock.beat % V) + V) % V) / V, Dt = kDepth * (0.5 - 0.5 * Math.cos(TAU * ph)), kf = Math.floor(Dt);
+    const V = Q * P.fBeats * Math.max(1, Math.ceil(2 * kDepth * P.fPace / (Q * P.fBeats))), ph = (((clock.beat % V) + V) % V) / V, Dt = kDepth * (0.5 - 0.5 * Math.cos(TAU * ph)), kf = Math.floor(Dt);
     const vb = focus.vbits; vb.length = Math.min(vb.length, kf + 1);
     while (vb.length < Math.min(kf + 1, kDepth)) vb.push(head[vb.length % (n.length + 1)] < 0 ? -1 : 1);
     const a = fp(vb.slice(0, kf)), b = fp(vb.slice(0, kf + 1)), t = Dt - kf;
@@ -1098,7 +1098,7 @@ function frame(now) {
     focus.vD = Dt; focus.vLeft = V * (1 - ph);
   } else {
   const bits = Array.from({ length: kDepth }, (_, i) => head[i % (n.length + 1)] < 0 ? -1 : 1), key = P.fType + bits.join('');
-  focus.s = Math.min(1, focus.s + dB / 2);
+  focus.s = Math.min(1, focus.s + dB / (P.fPace * Math.max(1, kDepth)));
   if (key !== focus.key && (focus.s >= 1 || !focus.from)) { focus.key = key; focus.bits = bits; focus.from = focus.cur; focus.s = 0; }
   {
     const to = fp(focus.bits), fr = focus.from || to;
@@ -1185,6 +1185,7 @@ slider('fractal', 'fScale', 'Edge distance', 0.5, 1.3, 0.01);
 slider('fractal', 'fZoom', 'Fractal zoom', 0.5, 3, 0.05);
 slider('fractal', 'fSlice', 'd5 → slice', 0, 1.5, 0.01);
 slider('fractal', 'fFocus', 'Focus depth', 0, 1.5, 0.05, v => v ? v + ' × angles' : 'off');
+slider('fractal', 'fPace', 'Zoom pace', 1, 32, 1, v => v + ' beats / level');
 slider('feedback', 'decay', 'Trail decay', 0, 0.99, 0.01);
 slider('feedback', 'zoom', 'Trail zoom', 0.9, 1.1, 0.002);
 slider('feedback', 'fbRot', 'Trail twist / beat', -30, 30, 0.5, deg);
